@@ -77,12 +77,14 @@ function saveSoon() {
 // ---------------------------------------------------------------------------
 // Theme and view mode
 
-function applyTheme(choice) {
+// Light unless the visitor picks otherwise. Only a click is saved (as
+// themeChoice), so the default is never stored as if it had been chosen.
+function applyTheme(choice, save = true) {
   const root = document.documentElement;
   if (choice === "light" || choice === "dark") root.setAttribute("data-theme", choice);
   else root.removeAttribute("data-theme");
   document.querySelectorAll("[data-theme-choice]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.themeChoice === (choice || "system"))));
-  setPref({ theme: choice });
+  if (save) setPref({ themeChoice: choice });
 }
 
 function applyMode(mode) {
@@ -2480,7 +2482,7 @@ function wireHeader() {
 
 function init() {
   const prefs = readStore(PREFS_KEY) || {};
-  applyTheme(prefs.theme || "system");
+  applyTheme(prefs.themeChoice || "light", false);
   applyMode(prefs.mode || "easy");
   const saved = readStore(STORE_KEY);
   let restored = null;

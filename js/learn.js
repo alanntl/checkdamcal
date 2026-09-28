@@ -20,6 +20,11 @@ function text(parent, x, y, str, cls = "sec-label", anchor = "start") {
 }
 
 /** An SVG sized to its host; returns [svg, W, H]. */
+/** Size of a bar piece after the 2 px gap to its neighbour. The gap is capped at
+ *  a quarter of the piece, so a sliver (a 3 px day of evaporation) keeps most of
+ *  its true size instead of shrinking to 1 px beside a 15 px neighbour. */
+const gapped = (w) => Math.max(1, w - Math.min(2, w * 0.25));
+
 function canvas(host, ratio, min, max, label) {
   const W = Math.max(280, host.clientWidth || 600);
   const H = Math.round(Math.min(max, Math.max(min, W * ratio)));
@@ -329,7 +334,7 @@ function lessonBalance(v, wb, st, section) {
           continue;
         }
         const x = X(x0);
-        const w = Math.max(1, X(x0 + q.value) - X(x0) - 2);
+        const w = gapped(X(x0 + q.value) - X(x0));
         const g = enter(s("g", {}, svg), q.stage === stage);
         s("rect", { x, y, width: w, height: 26, rx: 3, style: `fill:${q.color}` }, g);
         if (w > 70) text(g, x + 6, y + 17, `${q.label} ${F.num(q.value)}`, q.color === "var(--c-storage)" ? "learn-in-bar on-light" : "learn-in-bar");
@@ -375,7 +380,7 @@ function lessonBalance(v, wb, st, section) {
           color: "var(--c-recharge)",
           words: "Soaking in (rain, rising or overflowing days) = the season’s average soaking rate × average area",
           symbols: "R = r × ½ (A₋₁ + A)",
-          numbers: `R = ${F.num(v.rate, 4)} m/day × ${F.num(v.avgArea, 1)} m² × 1 day = ${F.num(rech, 1)} m³`,
+          numbers: `R = ${F.num(v.rate, 5)} m/day × ${F.num(v.avgArea, 1)} m² × 1 day = ${F.num(rech, 1)} m³`,
         },
     {
       color: "var(--c-spill)",
@@ -443,7 +448,7 @@ function lessonSoak(v, wb) {
         for (const q of parts) {
           if (q.stage > stage || q.mm <= 0) continue;
           const g = enter(s("g", {}, svg), q.stage === stage);
-          s("rect", { x, y: Y(y0), width: 90, height: Math.max(1, Y(y0 + q.mm) - Y(y0) - 2), rx: 3, style: `fill:${q.color}` }, g);
+          s("rect", { x, y: Y(y0), width: 90, height: gapped(Y(y0 + q.mm) - Y(y0)), rx: 3, style: `fill:${q.color}` }, g);
           text(g, x + 100, Y(y0) + Math.max(12, (Y(y0 + q.mm) - Y(y0)) / 2) + 4, `${q.label} ${F.num(q.mm, 1)} mm`, "sec-label");
           y0 += q.mm;
         }
@@ -488,7 +493,7 @@ function lessonSoak(v, wb) {
       color: "var(--c-recharge)",
       words: "The season’s soaking rate = the average of K over the dry days",
       symbols: "r = ΣK ÷ n",
-      numbers: `r = ${F.num(wb.dryWeatherTotal, 3)} m ÷ ${wb.counts.dryDays} days = ${F.num(wb.mdwir, 4)} m/day = ${F.num(wb.mdwir * 1000, 1)} mm/day`,
+      numbers: `r = ${F.num(wb.dryWeatherTotal, 3)} m ÷ ${wb.counts.dryDays} days = ${F.num(wb.mdwir, 5)} m/day = ${F.num(wb.mdwir * 1000, 1)} mm/day`,
     },
   ];
   return {
@@ -580,7 +585,7 @@ function lessonSeason(v, wb, st) {
       const small = [];
       for (const q of parts) {
         const w = ((W - m.l - m.r) * q.value) / total;
-        s("rect", { x: x0, y, width: Math.max(1, w - 2), height: 22, rx: 3, style: `fill:${q.color}` }, parent);
+        s("rect", { x: x0, y, width: gapped(w), height: 22, rx: 3, style: `fill:${q.color}` }, parent);
         if (w > 150) text(parent, x0 + 6, y + 15, `${q.label} ${F.num(q.value)} m³`, "learn-in-bar");
         else small.push(`${q.label} ${F.num(q.value)} m³`);
         x0 += w;
@@ -609,13 +614,13 @@ function lessonSeason(v, wb, st) {
       color: "var(--c-recharge)",
       words: "Share of the water left at the end that soaks in = what’s left × soaking rate ÷ (soaking rate + evaporation rate)",
       symbols: "R_end = V_end × r ÷ (r + e)",
-      numbers: `R_end = ${F.num(e.remaining, 1)} m³ × ${F.num(e.rate, 4)} ÷ (${F.num(e.rate, 4)} + ${F.trim(wb.params.evaporation, 4)}) = ${F.num(e.recharge, 1)} m³`,
+      numbers: `R_end = ${F.num(e.remaining, 1)} m³ × ${F.num(e.rate, 5)} ÷ (${F.num(e.rate, 5)} + ${F.trim(wb.params.evaporation, 4)}) = ${F.num(e.recharge, 1)} m³`,
     },
     {
       color: "var(--c-evap)",
       words: "…and the share that evaporates",
       symbols: "E_end = V_end × e ÷ (r + e)",
-      numbers: `E_end = ${F.num(e.remaining, 1)} m³ × ${F.trim(wb.params.evaporation, 4)} ÷ (${F.num(e.rate, 4)} + ${F.trim(wb.params.evaporation, 4)}) = ${F.num(e.evaporation, 1)} m³`,
+      numbers: `E_end = ${F.num(e.remaining, 1)} m³ × ${F.trim(wb.params.evaporation, 4)} ÷ (${F.num(e.rate, 5)} + ${F.trim(wb.params.evaporation, 4)}) = ${F.num(e.evaporation, 1)} m³`,
     },
     {
       words: "Check: everything that came in went somewhere",
@@ -704,7 +709,7 @@ function lessonSpell(rec, wb, st) {
       color: "var(--c-recharge)",
       words: "All spells together, each counted by its number of readings minus one",
       symbols: "r = −(Σ (n−1)·slope ÷ Σ (n−1)) − e",
-      numbers: `r = −(${runs.map((r) => `${r.n - 1}×(${F.num(r.slope, 2)})`).join(" + ")}) ÷ ${P.weight} − ${F.num(evapCm, 2)} = ${F.num(P.infiltrationCm, 3)} cm/day = ${F.num(P.infiltrationMm, 1)} mm/day`,
+      numbers: `r = −(${runs.map((r) => `${r.n - 1}×(${F.num(r.slope, 3)})`).join(" + ")}) ÷ ${P.weight} − ${F.num(evapCm, 2)} = ${F.num(P.infiltrationCm, 3)} cm/day = ${F.num(P.infiltrationMm, 1)} mm/day`,
     },
     {
       words: "The best-fit slope (least squares), for experts",

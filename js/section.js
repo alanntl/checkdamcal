@@ -299,11 +299,14 @@ export function drawExplainer(host) {
     L(gLabelX, gaugeTop - 8, "Gauge board", "start", "sec-label");
     L(W * 0.5, H - 8, "Groundwater", "middle", "sec-label");
   } else {
-    L(W * 0.03, H * 0.05 + 44, "Rain runs off the land into the pond");
+    // Between the narrow layout and ~800 px the full sentences collide, so
+    // the three labels that share a row with a neighbour get a shorter form.
+    const tight = W < 800;
+    L(W * 0.03, H * 0.05 + 44, tight ? "Rain runs off the land" : "Rain runs off the land into the pond");
     L(W * 0.42, waterY - 42, "Some evaporates", "middle");
     L(W * 0.41, gwY + 18, "Some soaks into the ground: groundwater recharge", "middle");
-    L(W - 8, bedBottom - 12, "The rest spills over the dam", "end");
-    L(gLabelX, gaugeTop - 8, "Gauge board: read the level every day", "start", "sec-label");
+    L(W - 8, bedBottom - 12, tight ? "Spills over the dam" : "The rest spills over the dam", "end");
+    L(gLabelX, gaugeTop - 8, tight ? "Gauge board: read daily" : "Gauge board: read the level every day", "start", "sec-label");
     L(W * 0.5, H - 10, "Groundwater, the water that wells draw on", "middle", "sec-label");
   }
   host.replaceChildren(svg);

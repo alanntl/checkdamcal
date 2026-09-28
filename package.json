@@ -1,0 +1,10 @@
+{
+  "name": "checkdamcal",
+  "private": true,
+  "description": "Check dam water balance and recharge calculator — web version of MyCheckDam.xlsx",
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "serve": "python3 serve.py 5288"
+  }
+}

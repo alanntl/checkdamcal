@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CheckDamCal</title>
+    <meta
+      name="description"
+      content="Water balance and groundwater recharge calculator for check dams — the web version of the MyCheckDam spreadsheet."
+    />
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2318776f'/%3E%3Cpath d='M5 20.5c3-2 5-2 8 0s5 2 8 0 5-2 6 0' fill='none' stroke='%23fff' stroke-width='2.2' stroke-linecap='round'/%3E%3Crect x='19' y='6' width='5' height='20' rx='1' fill='%23fff'/%3E%3Cpath d='M19 9h2.5M19 13h2.5M19 17h2.5' stroke='%2318776f' stroke-width='1.6'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="css/styles.css" />
+    <script src="vendor/xlsx.mini.min.js" defer></script>
+    <script type="module" src="js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+
+    <header class="app-header">
+      <div class="wrap header-inner">
+        <a class="brand" href="#start" aria-label="CheckDamCal, start here">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <rect width="32" height="32" rx="8" fill="var(--accent)" />
+            <path d="M5 20.5c3-2 5-2 8 0s5 2 8 0 5-2 6 0" fill="none" stroke="var(--accent-ink)" stroke-width="2.2" stroke-linecap="round" />
+            <rect x="19" y="6" width="5" height="20" rx="1" fill="var(--accent-ink)" />
+            <path d="M19 9h2.5M19 13h2.5M19 17h2.5" stroke="var(--accent)" stroke-width="1.6" />
+          </svg>
+          <span class="brand-name">CheckDamCal</span>
+        </a>
+        <div class="site">
+          <label class="site-label" for="site-name">Site</label>
+          <input id="site-name" class="site-input" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="header-actions">
+          <div class="seg mode-switch" role="group" aria-label="How much detail to show">
+            <button type="button" data-mode-choice="easy" title="The essentials, in plain words">Easy</button>
+            <button type="button" data-mode-choice="advanced" title="Every setting and table from the spreadsheet">Advanced</button>
+          </div>
+          <button class="btn" id="btn-import" type="button">Import</button>
+          <input type="file" id="file-input" accept=".xlsx,.xlsm,.xls,.csv,.json" hidden />
+          <details class="menu" id="menu">
+            <summary class="btn">More</summary>
+            <div class="menu-panel">
+              <button type="button" data-action="export-xlsx">Download results (.xlsx)</button>
+              <button type="button" data-action="save-json">Save project (.json)</button>
+              <hr />
+              <button type="button" data-action="load-example">Load the Badgaon example</button>
+              <button type="button" data-action="new-site">Start a new site</button>
+              <hr />
+              <div class="menu-theme">
+                <span>Theme</span>
+                <span class="seg" role="group" aria-label="Theme">
+                  <button type="button" data-theme-choice="system">Auto</button>
+                  <button type="button" data-theme-choice="light">Light</button>
+                  <button type="button" data-theme-choice="dark">Dark</button>
+                </span>
+              </div>
+            </div>
+          </details>
+        </div>
+      </div>
+      <nav class="wrap tabs steps" role="tablist" aria-label="Steps">
+        <button class="tab step" role="tab" id="tab-start" data-tab="start" aria-controls="panel-start">
+          <span class="step-n" aria-hidden="true">i</span>Start here
+        </button>
+        <button class="tab step" role="tab" id="tab-dam" data-tab="dam" aria-controls="panel-dam">
+          <span class="step-n" aria-hidden="true">1</span>Your check dam
+        </button>
+        <button class="tab step" role="tab" id="tab-survey" data-tab="survey" aria-controls="panel-survey">
+          <span class="step-n" aria-hidden="true">2</span>Pond survey
+        </button>
+        <button class="tab step" role="tab" id="tab-readings" data-tab="readings" aria-controls="panel-readings">
+          <span class="step-n" aria-hidden="true">3</span>Daily readings
+        </button>
+        <button class="tab step" role="tab" id="tab-balance" data-tab="balance" aria-controls="panel-balance">
+          <span class="step-n" aria-hidden="true">4</span>Results
+        </button>
+        <button class="tab step" role="tab" id="tab-recession" data-tab="recession" aria-controls="panel-recession">
+          <span class="step-n" aria-hidden="true">5</span>Infiltration rate
+        </button>
+        <button class="tab step step-ref" role="tab" id="tab-learn" data-tab="learn" aria-controls="panel-learn">Learn</button>
+      </nav>
+    </header>
+
+    <div class="status-bar"><div class="wrap" id="status" aria-live="polite"></div></div>
+
+    <main id="main" class="wrap">
+      <section role="tabpanel" id="panel-start" aria-labelledby="tab-start" hidden></section>
+      <section role="tabpanel" id="panel-dam" aria-labelledby="tab-dam" hidden></section>
+      <section role="tabpanel" id="panel-survey" aria-labelledby="tab-survey" hidden></section>
+      <section role="tabpanel" id="panel-readings" aria-labelledby="tab-readings" hidden></section>
+      <section role="tabpanel" id="panel-balance" aria-labelledby="tab-balance" hidden></section>
+      <section role="tabpanel" id="panel-recession" aria-labelledby="tab-recession" hidden></section>
+
+      <section role="tabpanel" id="panel-learn" aria-labelledby="tab-learn" hidden>
+        <div id="learn-root"></div>
+        <details class="card prose reference" id="reference">
+          <summary>
+            <strong>For experts: every formula, the spreadsheet cells, and where the calculator differs</strong>
+          </summary>
+          <p style="margin-top: 12px">
+            The formulas are those of the MyCheckDam workbook (Peter Dillon’s check-dam water balance template); each
+            step names the workbook cells it reproduces.
+          </p>
+          <h3>What you need</h3>
+          <ul>
+            <li><strong>Daily gauge-board readings</strong> of the water in the check dam, in centimetres.</li>
+            <li><strong>Daily rainfall</strong> at the site, in millimetres.</li>
+            <li>
+              <strong>A one-time level survey</strong> (for example by dumpy level): the water-surface area, and if you have
+              it the stored volume, at a series of levels from the bed up past the spillway crest.
+            </li>
+            <li>
+              <strong>The structure</strong>: the reduced level (RL) of the gauge’s 0 cm mark, the spillway crest level,
+              the crest length, and the catchment area.
+            </li>
+          </ul>
+          <p>
+            Levels are reduced levels in metres. As in the workbook, a local datum is fine: the Badgaon example takes the
+            spillway crest (cease-to-flow level, CTF) as 100 m.
+          </p>
+
+          <h3>1 · Area and volume at each day’s level</h3>
+          <p>
+            The survey table is interpolated linearly between its levels (sheet 2, columns R–T). Blank volumes are filled
+            from the areas: the cone formula for the lowest segment, where the area starts at zero, and the trapezoidal
+            rule above it.
+          </p>
+          <div class="formula">V(bed → h₁) = A₁ · (h₁ − h₀) / 3
+V(hᵢ → hᵢ₊₁) = (Aᵢ + Aᵢ₊₁) · (hᵢ₊₁ − hᵢ) / 2</div>
+
+          <h3>2 · The daily water balance</h3>
+          <p>
+            For each day, with D the water level (m), E the water-surface area (m²), F the stored volume (m³), e the
+            evaporation rate (m/d) and P the rainfall (mm); the subscript −1 is the day before:
+          </p>
+          <div class="formula">Evaporation (m³)        I = ½ (E₋₁ + E) · e
+Dry-weather rate (m/d)  K = D₋₁ − D − e + P/1000   only if D &lt; CTF and D &lt; D₋₁ − e, else 0
+Dry-weather recharge    L = K · ½ (E₋₁ + E)
+Other-day recharge      M = r · ½ (E + E₋₁)          on days with K = 0
+Spill over the weir     N = C₁ · 86 400 · L₁ · (D − CTF)^a₁   if D ≥ CTF, else 0
+Inflow (m³)             O = (F − F₋₁) + I + L + M + N</div>
+          <p>
+            Inflow is not measured: it is whatever closes the balance. The running total of inflow minus evaporation,
+            recharge and spill must equal the water in the structure every day; the calculator checks this.
+          </p>
+          <p>
+            <strong>r</strong>, the infiltration rate on days when the level is above the spillway, rising or steady, is
+            by default the <strong>mean dry-weather infiltration rate</strong> of the season: the average of K over the
+            days where K &gt; 0.0001 m/d (cell M10). You can instead use the mean rate of each period, or a fixed rate.
+          </p>
+          <p>
+            The first day compares against an empty structure, as the workbook does. If there was already water in it,
+            set the level on the day before the record in Step 1 (Advanced).
+          </p>
+
+          <h3>3 · Water left at the end</h3>
+          <p>
+            Water still stored on the last day is assumed to drain away later by infiltration and evaporation, in
+            proportion to their rates (cells AH131–AJ135):
+          </p>
+          <div class="formula">Recharge share     = V_end · r / (r + e)
+Evaporation share  = V_end · e / (r + e)</div>
+
+          <h3>4 · Season results</h3>
+          <div class="formula">Recharge / inflow         = total recharge / total inflow
+Runoff coefficient        = total inflow / (rainfall · catchment area)
+Share captured            = (inflow − spill) / inflow
+Evaporation / recharge    = total evaporation / total recharge</div>
+          <p>
+            The sensitivity table re-runs the balance with each of evaporation, the infiltration rate on wet days and
+            the weir coefficient changed by ±20 %.
+          </p>
+
+          <h3>5 · Dry-weather infiltration from the gauge alone</h3>
+          <p>
+            Step 5, <em>Infiltration rate</em>, uses the method of the workbook’s “Check dam calculator for MyWell”
+            sheet. It needs only the gauge readings and rainfall, so it works for any check dam monitored in MyWell,
+            even without a survey.
+          </p>
+          <ol>
+            <li>
+              A reading is a <strong>dry recession reading</strong> when, compared with the reading before it, the water
+              is not above the spillway, it did not rain more than 0.1 mm, and the level did not rise by more than 2 cm.
+            </li>
+            <li>Each unbroken run of at least three such readings gets a least-squares line of gauge reading (cm) against time (days).</li>
+            <li>The slopes are averaged with weights n − 1 (n = readings in the run), and the evaporation rate is subtracted.</li>
+          </ol>
+          <div class="formula">infiltration (cm/d) = −(Σ (n−1)·slope / Σ (n−1)) − evaporation (cm/d)
+pooled SE (cm/d)    = √( Σ (n−1)·SE² / Σ (n−1) )</div>
+          <p>
+            The two methods estimate the same thing from different days, so expect them to differ. For Badgaon in
+            2014 the recession runs give 19 mm/d (weighted) and 43 mm/d (unweighted), while the water balance gives
+            31 mm/d. The workbook’s note attributes the gap to faster infiltration when the dam holds more water.
+          </p>
+
+          <h3>Assumptions</h3>
+          <ul>
+            <li>No water is pumped or taken directly from the check dam.</li>
+            <li>Evaporation is constant through the season.</li>
+            <li>All inflow arrives as runoff from the catchment; seepage in from the banks counts as inflow.</li>
+            <li>Spill follows the weir equation with the coefficients you give; flow through the structure itself is not modelled.</li>
+            <li>One reading a day. The water balance needs every day in the record; a missing gauge reading between two days is interpolated and marked.</li>
+          </ul>
+
+          <h3 id="differences">Differences from the spreadsheet</h3>
+          <p>
+            With the Badgaon example the calculator reproduces every daily column and total of the workbook to
+            floating-point precision (checked by the tests in <code>test/</code>). Where it does not, it is deliberate:
+          </p>
+          <div class="table-scroll">
+            <table class="data-table diff-table">
+              <thead>
+                <tr><th>What</th><th>Workbook</th><th>Calculator</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Water left on the last day (AH131)</td>
+                  <td>Typed as 3,014 m³, so the balance ends at −0.34 m³</td>
+                  <td>The last day’s volume, 3,013.66 m³; the balance closes at 0. Recharge is 0.29 m³ lower.</td>
+                </tr>
+                <tr>
+                  <td>Evaporation / recharge (H158)</td>
+                  <td>R150 / Q151 = 0.163: evaporation without the end share over recharge with it</td>
+                  <td>Both with the end share: 0.167</td>
+                </tr>
+                <tr>
+                  <td>Pooled standard error of the recession slope (row 119)</td>
+                  <td>Uses (n−1)·SE although labelled SE²; the result, 0.32, has units of √(cm/d)</td>
+                  <td>Uses (n−1)·SE² as labelled: 0.19 cm/d</td>
+                </tr>
+                <tr>
+                  <td>Sensitivity table (rows 160–168)</td>
+                  <td>Pasted values from earlier runs; the C₁ row is labelled 1.28 but its values are for 1.3</td>
+                  <td>Recalculated whenever an input changes</td>
+                </tr>
+                <tr>
+                  <td>Levels above the survey table</td>
+                  <td>#REF! error</td>
+                  <td>The top segment is extended, with a warning</td>
+                </tr>
+                <tr>
+                  <td>Recession readings at 0 cm</td>
+                  <td>Would be fitted as real levels</td>
+                  <td>Skipped: the water is at or below the gauge zero, so its level is unknown. No effect on Badgaon.</td>
+                </tr>
+                <tr>
+                  <td>Missing days</td>
+                  <td>You type the adjusted level in column D</td>
+                  <td>Enter a level override, or leave the day blank to interpolate between its neighbours</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted" style="margin-top: 10px">
+            Also noted, with no effect on results: the first row of column M compares a number with the text “0.001”,
+            which Excel always treats as true; the first day’s dry-weather rate is 0 either way. The survey volume at
+            98 m was typed as 225 m³ where the cone formula gives 224.7 m³; entered volumes are used as entered.
+          </p>
+
+          <h3>Sources</h3>
+          <p>
+            Water balance template by Peter Dillon. Badgaon check dam gauge-board and rainfall readings (July–November
+            2014) and dumpy-level survey by Yogita, MARVI project. The water-balance infiltration rate for Badgaon is
+            discussed in Dashora et al. (2019).
+          </p>
+        </details>
+      </section>
+    </main>
+
+    <footer class="wrap app-footer">
+      <p>CheckDamCal runs entirely in your browser. Your data stays on this device unless you download or share it.</p>
+      <p>Water balance method from the MyCheckDam workbook (template by Peter Dillon, MARVI). <a href="#learn">Learn how it works</a></p>
+    </footer>
+
+    <dialog id="confirm-dialog">
+      <form method="dialog">
+        <h3 id="confirm-title"></h3>
+        <p id="confirm-body"></p>
+        <div class="dialog-actions">
+          <button class="btn" value="cancel" type="submit">Cancel</button>
+          <button class="btn btn-primary" id="confirm-ok" value="ok" type="submit"></button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="paste-dialog">
+      <form method="dialog">
+        <h3>Paste readings</h3>
+        <p>
+          Copy the columns from your spreadsheet — date, gauge reading (cm), rainfall (mm), and optionally a level override
+          (m) — and paste them here. A header row is fine.
+        </p>
+        <textarea id="paste-text" spellcheck="false" aria-label="Pasted readings"></textarea>
+        <p id="paste-feedback" class="field-error"></p>
+        <div class="dialog-actions">
+          <button class="btn" value="cancel" type="submit">Cancel</button>
+          <button class="btn btn-primary" id="paste-ok" value="ok" type="submit">Replace readings</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>

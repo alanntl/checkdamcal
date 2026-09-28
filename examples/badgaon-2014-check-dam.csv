@@ -1,0 +1,8 @@
+﻿Item,Value,Unit,Notes
+Gauge zero level,98.43,m,Height of the gauge board’s 0 cm mark
+Spillway level,100,m,Height of the top of the overflow section (water spills above it)
+Spillway length,12.7,m,"Width of the overflow section, across the stream"
+Evaporation,5,mm/day,Water lost to the air from the pond each day
+Catchment area,338.31,ha,Optional: land that drains into the check dam
+Weir coefficient,1.6,,Advanced: C₁ in Q = C₁·L₁·H^a₁ (m³/s); the workbook uses 1.6
+Weir exponent,1.5,,Advanced: a₁; 1.5 for a broad-crested weir

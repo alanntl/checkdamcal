@@ -2636,6 +2636,21 @@ body.dragging .drop-zone {
 .focus body {
   background: transparent;
 }
+/* Focus mode shows just the form unless the host turns explanations on
+   (message "explain"): no why / you'll-need text, lesson links, help lines,
+   tips, diagrams, survey charts, checks card, or info and warning notices.
+   Errors stay. */
+.focus:not(.explain) :is(.step-why, .step-need, .learn-link, .field .help, .choice .help, .diagram-caption, p.toolbar-note, .card p.muted),
+.focus:not(.explain) .notice:not(.error),
+.focus:not(.explain) .dam-layout > :nth-child(2),
+.focus:not(.explain) #panel-survey .grid-2 > :nth-child(2),
+.focus:not(.explain) #panel-readings .stack > .card:first-child {
+  display: none;
+}
+.focus:not(.explain) .dam-layout,
+.focus:not(.explain) #panel-survey .grid-2 {
+  grid-template-columns: minmax(0, 560px);
+}
 .focus main {
   padding-top: 4px;
   padding-bottom: 8px;

@@ -2746,6 +2746,7 @@ function init() {
 //                 {source:"ourwater", type:"example"}             the Badgaon example
 //                 {source:"ourwater", type:"goto", tab}           show one panel (focus mode)
 //                 {source:"ourwater", type:"export", what:"pdf"|"xlsx"|"project"}
+//                 {source:"ourwater", type:"explain", on}         focus mode: show the explanations
 //                 {source:"ourwater", type:"theme", theme:"light"|"dark"}
 //                 {source:"ourwater", type:"mode", mode:"easy"|"advanced"}
 //   here -> host: {source:"checkdamcal", type:"ready"}
@@ -2815,6 +2816,7 @@ function onHostMessage(e) {
   const m = e.data;
   if (!m || typeof m !== "object" || m.source !== "ourwater") return;
   if (m.type === "theme") applyTheme(m.theme === "dark" ? "dark" : "light", false);
+  else if (m.type === "explain") document.documentElement.classList.toggle("explain", !!m.on);
   else if (m.type === "mode") applyMode(m.mode === "advanced" ? "advanced" : "easy");
   else if (m.type === "load") loadFromHost(m);
   else if (m.type === "file" && m.file instanceof File) onFileChosen(m.file);

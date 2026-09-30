@@ -1,7 +1,11 @@
 // CheckDamCal — the page: a guided, step-by-step front end on the engine.
 //
 //   Start here → 1 Your check dam → 2 Pond survey → 3 Daily readings
-//   → 4 Results → 5 Infiltration rate (optional) · How it works
+//   → 4 Results → 5 Infiltration rate (optional) → Report (PDF) · Learn
+//
+// Start here offers two ways in: drop a file and go straight to the report,
+// or enter the data step by step. Opened with ?embed inside OurWater, the
+// host page sends the data (see "Embedded in OurWater" at the end).
 //
 // Easy view shows the essentials in plain words; Advanced adds every setting
 // and table from the workbook (elements marked .adv). Inputs live in
@@ -13,13 +17,14 @@ import * as F from "./format.js";
 import { h } from "./dom.js";
 import { TimeChart, XYChart } from "./charts.js";
 import { drawSection, drawExplainer, diagramStage } from "./section.js";
-import { readFile, exportResults, saveProjectFile, checkProject, toIsoDate } from "./io.js";
+import { readFile, exportResults, saveProjectFile, checkProject, toIsoDate, downloadBytes } from "./io.js";
+import { reportModel, buildReportPdf, reportFileName } from "./report.js";
 import { createLearn } from "./learn.js";
 import { badgaonExample } from "./example.js";
 
 const STORE_KEY = "checkdamcal.project.v1";
 const PREFS_KEY = "checkdamcal.prefs.v1";
-const TABS = ["start", "dam", "survey", "readings", "balance", "recession", "learn"];
+const TABS = ["start", "dam", "survey", "readings", "balance", "recession", "report", "learn"];
 const STEP_NAME = {
   start: "Start here",
   dam: "Step 1 · Your check dam",
@@ -27,10 +32,14 @@ const STEP_NAME = {
   readings: "Step 3 · Daily readings",
   balance: "Step 4 · Results",
   recession: "Step 5 · Infiltration rate",
+  report: "Report",
   learn: "Learn",
 };
 const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const $ = (sel, root = document) => root.querySelector(sel);
+// Inside a page of the same site (OurWater) with ?embed: the host sends the
+// data and the theme, and hears when the dam's setup changes.
+const EMBED = new URLSearchParams(location.search).has("embed") && window.parent !== window;
 
 const state = {
   project: null,
@@ -43,7 +52,7 @@ const state = {
   hover: null,
   highlightRun: null,
   playTimer: null,
-  notices: { start: [], dam: [], survey: [], readings: [], balance: [], recession: [] },
+  notices: { start: [], dam: [], survey: [], readings: [], balance: [], recession: [], report: [] },
 };
 const ui = {}; // element and chart references, filled by the build* functions
 
@@ -282,6 +291,7 @@ function update({ immediate = false, readingsGrid = false } = {}) {
     recompute();
     renderAll({ readingsGrid });
     saveSoon();
+    announceSetup();
   };
   if (immediate) run();
   else updateTimer = setTimeout(run, 180);
@@ -297,6 +307,7 @@ function renderAll({ readingsGrid = false } = {}) {
   updateReadingsDerived();
   updateBalance();
   updateRecession();
+  updateReport();
   if (state.tab === "learn") ui.learn?.update();
 }
 
@@ -331,6 +342,7 @@ function renderStatus() {
   );
   setStepState("balance", wb.ok ? "done" : null, wb.ok ? "ready" : "not ready yet");
   setStepState("recession", rec.ok && rec.runs?.length ? "done" : null, rec.ok && rec.runs?.length ? "ready" : "not ready yet");
+  setStepState("report", wb.ok ? "done" : null, wb.ok ? "ready to download" : "not ready yet");
 
   const go = (tab, label) => h("button", { class: "btn-link", type: "button", text: label, onclick: () => goTab(tab) });
   const line = (...children) => h("div", { class: "status-next" }, ...children);
@@ -353,6 +365,7 @@ function renderStatus() {
     ),
   ];
   if (state.tab !== "balance") parts.push(go("balance", "See the results"));
+  if (state.tab !== "report") parts.push(go("report", "Get the PDF report"));
   if (checks && state.tab !== "readings") parts.push(h("span", { text: `${checks} reading${checks === 1 ? "" : "s"} to check in Step 3.` }));
   if (state.mode === "advanced") {
     parts.push(
@@ -374,7 +387,8 @@ function setStepState(tab, st, label) {
   else delete btn.dataset.state;
   const n = btn.querySelector(".step-n");
   const num = { dam: "1", survey: "2", readings: "3", balance: "4", recession: "5" }[tab];
-  if (n) n.textContent = st === "done" ? "✓" : st === "problem" || st === "check" ? "!" : num;
+  // The report's marker is a document icon, not a number: its state shows as colour only.
+  if (n && num) n.textContent = st === "done" ? "✓" : st === "problem" || st === "check" ? "!" : num;
   btn.setAttribute("aria-label", `${STEP_NAME[tab]}, ${label}`);
 }
 
@@ -483,6 +497,7 @@ function buildStart() {
         text: "A check dam holds back the water that runs down a stream after rain. That water then does one of three things: it soaks into the ground and refills the groundwater that wells draw on, it evaporates into the air, or it spills over the top of the dam. CheckDamCal works out how much went each way, from readings you take at the dam.",
       }),
     ),
+    waysIn(),
     h(
       "div",
       { class: "stack" },
@@ -500,14 +515,6 @@ function buildStart() {
           "What you get",
           null,
           getGrid,
-          h(
-            "div",
-            { class: "start-actions", style: "margin-top:18px" },
-            h("button", { class: "btn btn-primary", type: "button", text: "Walk through the example", onclick: walkExample }),
-            h("button", { class: "btn", type: "button", text: "Learn how it works", onclick: () => goTab("learn") }),
-            h("button", { class: "btn", type: "button", text: "Start with my own check dam", onclick: () => menuAction("new-site") }),
-            h("button", { class: "btn btn-ghost", type: "button", text: "Import a spreadsheet", onclick: () => $("#file-input").click() }),
-          ),
           h("p", {
             class: "muted",
             style: "margin-top:12px;font-size:13.5px",
@@ -518,6 +525,49 @@ function buildStart() {
       formatCard(),
     ),
   );
+}
+
+/** The two ways in: a file straight to the report, or the steps one by one. */
+function waysIn() {
+  const fromFile = h(
+    "section",
+    { class: "way way-file", "aria-labelledby": "way-file-title" },
+    h("h3", { id: "way-file-title", text: "Have the data in a file? Get the report." }),
+    h("p", {
+      text: "Open the MyCheckDam spreadsheet, a filled-in CheckDamCal template or a saved project. The results and a PDF report are ready as soon as the file is read. The file stays on this device.",
+    }),
+    h(
+      "div",
+      { class: "drop-zone" },
+      h("span", { class: "drop-hint", text: "Drop the file here, or" }),
+      h("button", { class: "btn btn-primary", type: "button", text: "Choose a file", onclick: () => $("#file-input").click() }),
+    ),
+    h(
+      "p",
+      { class: "way-foot" },
+      "No file yet? Start from the ",
+      h("a", { href: `${EXAMPLES}checkdamcal-template.xlsx`, download: "", text: "blank template" }),
+      ", or try ",
+      h("a", { href: `${EXAMPLES}checkdamcal-badgaon-2014.xlsx`, download: "", text: "the example file" }),
+      ".",
+    ),
+  );
+  const bySteps = h(
+    "section",
+    { class: "way way-steps", "aria-labelledby": "way-steps-title" },
+    h("h3", { id: "way-steps-title", text: "Or enter it step by step" }),
+    h("p", {
+      text: "Type in your check dam’s levels, the pond survey and the daily readings. Each step says what it needs and why, and the results build up as you go.",
+    }),
+    h(
+      "div",
+      { class: "way-actions" },
+      h("button", { class: "btn", type: "button", text: "Start with my own check dam", onclick: () => menuAction("new-site") }),
+      h("button", { class: "btn", type: "button", text: "Walk through the example", onclick: walkExample }),
+    ),
+    h("p", { class: "way-foot" }, "New to this? ", learnLink(1, "See how it works, one picture at a time")),
+  );
+  return h("div", { class: "ways" }, fromFile, bySteps);
 }
 
 /** A small table of example rows; numCols are right-aligned (default: all but the first). */
@@ -2280,14 +2330,17 @@ async function onFileChosen(file) {
       if (!ok) return;
     }
     state.project = res.project;
+    state.project.site = { ...state.project.site, source: state.project.site?.source || file.name };
     state.day = null;
     state.highlightRun = null;
     resetNotices();
     renderStageRows();
     update({ immediate: true, readingsGrid: true });
-    addNotice("balance", { kind: "info", title: `Imported ${file.name}.`, body: h("ul", {}, res.summary.map((l) => h("li", { text: l }))) });
-    for (const w of res.warnings) addNotice("balance", { kind: "warn", title: null, body: w });
-    goTab(state.results.wb.ok ? "balance" : "dam");
+    // A complete file goes straight to the report; otherwise to the first step to finish.
+    const target = state.results.wb.ok ? "report" : firstIncompleteStep();
+    addNotice(target, { kind: "info", title: `Imported ${file.name}.`, body: h("ul", {}, res.summary.map((l) => h("li", { text: l }))) });
+    for (const w of res.warnings) addNotice(target, { kind: "warn", title: null, body: w });
+    goTab(target);
   } else if (res.kind === "survey") {
     const hasSurvey = state.project.stage.some((r) => isNum(r.area) && r.area > 0);
     if (hasSurvey && !state.isExample) {
@@ -2343,8 +2396,132 @@ function doExport() {
   exportResults(state.project, wb, rec, sens);
 }
 
+/** The first step with something still to fill in or fix. */
+function firstIncompleteStep() {
+  if (problemsBy("dam").length) return "dam";
+  if (problemsBy("survey").length) return "survey";
+  return "readings";
+}
+
+// ---------------------------------------------------------------------------
+// Report
+
+/** Where the data came from, as the report says it. */
+function reportSource() {
+  if (state.isExample) return "the Badgaon example (MyCheckDam spreadsheet, MARVI)";
+  return state.project.site?.source || "entered in CheckDamCal";
+}
+
+function downloadReport() {
+  if (!state.results.wb.ok) {
+    goTab("report");
+    return;
+  }
+  try {
+    const bytes = buildReportPdf(state.project, state.results, { source: reportSource() });
+    downloadBytes(bytes, reportFileName(state.project));
+  } catch (err) {
+    addNotice("report", { kind: "error", title: "Couldn’t make the PDF.", body: err?.message || String(err) });
+    goTab("report");
+  }
+}
+
+function buildReport() {
+  const panel = $("#panel-report");
+  ui.notices_report = h("div", { class: "notices" });
+  ui.reportBody = h("div", { class: "report-body" });
+  panel.append(
+    stepHead({
+      kicker: "Report",
+      title: "The report",
+      why: "The results on a few pages, to share or to file: what happened to the water, the charts through the season, how each number was worked out, the checks on the data and every day’s figures.",
+    }),
+    ui.notices_report,
+    ui.reportBody,
+  );
+}
+
+function reportTable(rows) {
+  return h(
+    "table",
+    { class: "rs-table" },
+    h(
+      "tbody",
+      {},
+      rows.map((r) =>
+        h("tr", {}, h("th", { scope: "row", text: r.label }), h("td", { class: "num", text: r.value }), h("td", { class: "rs-note", text: r.note || "" })),
+      ),
+    ),
+  );
+}
+
+function updateReport() {
+  const host = ui.reportBody;
+  if (!host) return;
+  const m = reportModel(state.project, state.results, { source: reportSource() });
+  if (!m.ok) {
+    host.replaceChildren(
+      h(
+        "div",
+        { class: "card report-empty" },
+        h("h3", { text: "The report is ready once the three steps are done" }),
+        h("p", { class: "muted", text: "Still to do:" }),
+        h("ul", {}, m.problems.slice(0, 6).map((t) => h("li", { text: t }))),
+        h("div", { class: "report-actions" }, h("button", { class: "btn btn-primary", type: "button", text: "Go to the step to finish", onclick: () => goTab(firstIncompleteStep()) })),
+      ),
+    );
+    return;
+  }
+  const split = h(
+    "div",
+    { class: "rs-split" },
+    h(
+      "div",
+      { class: "partition", role: "img", "aria-label": m.parts.map((q) => `${q.label} ${F.pct(q.share)}`).join(", ") },
+      m.parts.filter((q) => q.value > 0).map((q) => h("span", { style: `--c:${q.color};flex:${q.share}` })),
+    ),
+    h(
+      "ul",
+      { class: "split-list" },
+      m.parts.map((q) =>
+        h("li", {}, h("span", { class: "split-key", style: `--c:${q.color}` }), h("span", { text: q.label }), h("span", { class: "v", text: `${F.num(q.value)} m³` }), h("span", { class: "p", text: F.pct(q.share) })),
+      ),
+    ),
+  );
+  host.replaceChildren(
+    h(
+      "div",
+      { class: "report-actions" },
+      h("button", { class: "btn btn-primary", type: "button", text: "Download the PDF report", onclick: downloadReport }),
+      h("button", { class: "btn", type: "button", text: "Download the numbers (.xlsx)", onclick: doExport }),
+      h("span", { class: "muted report-actions-note", text: "The PDF has everything below, plus the charts, the method, the sensitivity and every day’s numbers." }),
+    ),
+    h(
+      "article",
+      { class: "report-sheet", "aria-label": "What the report says" },
+      h("p", { class: "rs-kicker", text: "Check dam water balance" }),
+      h("h3", { class: "rs-title", text: m.site }),
+      h("p", { class: "rs-meta", text: `${m.period.label} · ${m.period.days} days` }),
+      m.source ? h("p", { class: "rs-source", text: `Data: ${m.source}` }) : null,
+      h(
+        "div",
+        { class: "rs-headline" },
+        h("p", { class: "rs-big" }, F.num(m.headline.recharge), h("span", { class: "unit", text: "m³" })),
+        h("p", { text: `soaked into the ground: ${F.pct(m.headline.share)} of the ${F.num(m.headline.inflow)} m³ of water that flowed into the pond.` }),
+      ),
+      h("h4", { text: "Where the water went" }),
+      split,
+      h("h4", { text: "Key numbers" }),
+      reportTable(m.keyNumbers),
+      h("h4", { text: "What went in" }),
+      reportTable(m.inputs),
+      m.checks.length ? [h("h4", { text: "Checks on the data" }), h("ul", { class: "rs-checks" }, m.checks.map((c) => h("li", { text: c })))] : null,
+    ),
+  );
+}
+
 function resetNotices() {
-  state.notices = { start: [], dam: [], survey: [], readings: [], balance: [], recession: [] };
+  state.notices = { start: [], dam: [], survey: [], readings: [], balance: [], recession: [], report: [] };
 }
 
 /** A blank site: the site-specific levels start empty so nothing is borrowed from Badgaon by accident. */
@@ -2365,7 +2542,8 @@ function newSiteProject() {
 
 async function menuAction(action) {
   $("#menu").open = false;
-  if (action === "export-xlsx") doExport();
+  if (action === "export-pdf") downloadReport();
+  else if (action === "export-xlsx") doExport();
   else if (action === "save-json") saveProjectFile(state.project);
   else if (action === "load-example") {
     if (!state.isExample && state.project.readings.length) {
@@ -2467,10 +2645,24 @@ function wireHeader() {
     goTab(tabs[j].dataset.tab);
   });
   // Drop a file anywhere.
+  // While a file is dragged over the page, the drop zone lights up.
+  let dragDepth = 0;
+  const dragging = (on) => document.body.classList.toggle("dragging", on);
+  document.addEventListener("dragenter", (e) => {
+    if (!e.dataTransfer?.types?.includes("Files")) return;
+    dragDepth += 1;
+    dragging(true);
+  });
+  document.addEventListener("dragleave", () => {
+    dragDepth = Math.max(0, dragDepth - 1);
+    if (!dragDepth) dragging(false);
+  });
   document.addEventListener("dragover", (e) => {
     if (e.dataTransfer?.types?.includes("Files")) e.preventDefault();
   });
   document.addEventListener("drop", (e) => {
+    dragDepth = 0;
+    dragging(false);
     const f = e.dataTransfer?.files?.[0];
     if (!f) return;
     e.preventDefault();
@@ -2481,6 +2673,10 @@ function wireHeader() {
 // ---------------------------------------------------------------------------
 
 function init() {
+  if (EMBED) {
+    document.documentElement.classList.add("embed");
+    window.addEventListener("message", onHostMessage);
+  }
   const prefs = readStore(PREFS_KEY) || {};
   applyTheme(prefs.themeChoice || "light", false);
   applyMode(prefs.mode || "easy");
@@ -2509,6 +2705,7 @@ function init() {
   buildReadings();
   buildBalance();
   buildRecession();
+  buildReport();
   ui.learn = createLearn($("#learn-root"), { results: () => state.results, goTab });
   wireHeader();
   recompute();
@@ -2519,6 +2716,75 @@ function init() {
   showTab(tabFromHash() || (restored && TABS.includes(prefs.tab) ? prefs.tab : "start"));
   // For checking and debugging in the browser console only.
   window.checkdamcal = { state, engine: E };
+  postToHost({ type: "ready" });
+}
+
+// ---------------------------------------------------------------------------
+// Embedded in OurWater
+//
+// Messages are accepted only from the parent page, and only when it is on
+// this page's own origin: the calculator is served from the app itself.
+//   host -> here: {source:"ourwater", type:"load", project, title?, summary?, warnings?, readingsNote?}
+//                 {source:"ourwater", type:"theme", theme:"light"|"dark"}
+//                 {source:"ourwater", type:"mode", mode:"easy"|"advanced"}
+//   here -> host: {source:"checkdamcal", type:"ready"}
+//                 {source:"checkdamcal", type:"setup", setup:{params, stage, recession}}
+//                   (after the user changes the dam or the survey, so the host can keep it)
+
+function postToHost(msg) {
+  if (EMBED) window.parent.postMessage({ source: "checkdamcal", ...msg }, location.origin);
+}
+
+let setupTimer = null;
+function announceSetup() {
+  if (!EMBED) return;
+  clearTimeout(setupTimer);
+  setupTimer = setTimeout(() => {
+    const p = state.project;
+    postToHost({
+      type: "setup",
+      setup: {
+        params: { ...p.params },
+        stage: p.stage.map((r) => ({ rl: r.rl, area: r.area, volume: r.volume })),
+        recession: { ...p.recession },
+      },
+    });
+  }, 800);
+}
+
+function onHostMessage(e) {
+  if (e.source !== window.parent || e.origin !== location.origin) return;
+  const m = e.data;
+  if (!m || typeof m !== "object" || m.source !== "ourwater") return;
+  if (m.type === "theme") applyTheme(m.theme === "dark" ? "dark" : "light", false);
+  else if (m.type === "mode") applyMode(m.mode === "advanced" ? "advanced" : "easy");
+  else if (m.type === "load") loadFromHost(m);
+}
+
+function loadFromHost(m) {
+  let project;
+  try {
+    project = checkProject(m.project);
+  } catch (err) {
+    addNotice("start", { kind: "error", title: "Couldn’t load the data from OurWater.", body: err?.message || String(err) });
+    goTab("start");
+    return;
+  }
+  state.project = project;
+  state.isExample = false;
+  state.day = null;
+  state.highlightRun = null;
+  resetNotices();
+  renderStageRows();
+  recompute();
+  renderAll({ readingsGrid: true });
+  saveSoon();
+  const target = state.results.wb.ok ? "report" : firstIncompleteStep();
+  const lines = Array.isArray(m.summary) ? m.summary.map(String) : [];
+  addNotice(target, { kind: "info", title: m.title ? String(m.title) : "Loaded from OurWater.", body: lines.length ? h("ul", {}, lines.map((l) => h("li", { text: l }))) : null });
+  for (const w of Array.isArray(m.warnings) ? m.warnings : []) addNotice(target, { kind: "warn", title: null, body: String(w) });
+  if (m.readingsNote) addNotice("readings", { kind: "info", title: null, body: String(m.readingsNote) });
+  goTab(target);
 }
 
 init();

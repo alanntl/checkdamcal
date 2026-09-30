@@ -3,7 +3,7 @@
 // The real-workbook test reads MyCheckDam.xlsx from MYCHECKDAM_XLSX (skipped
 // when unset) — the workbook is project data and is not kept in the repo.
 //
-// Run:  MYCHECKDAM_XLSX=/path/to/MyCheckDam.xlsx node --test test/
+// Run:  MYCHECKDAM_XLSX=/path/to/MyCheckDam.xlsx node --test "test/*.test.mjs"
 
 import test from "node:test";
 import assert from "node:assert/strict";

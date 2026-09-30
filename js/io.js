@@ -367,7 +367,12 @@ export function checkProject(data) {
   if (!data || typeof data !== "object" || !Array.isArray(data.readings)) throw new Error("This file is not a CheckDamCal project.");
   return {
     version: 1,
-    site: { name: String(data.site?.name ?? "Check dam"), notes: String(data.site?.notes ?? "") },
+    site: {
+      name: String(data.site?.name ?? "Check dam"),
+      notes: String(data.site?.notes ?? ""),
+      // Where the data came from (a file name, an OurWater station); shown on the report.
+      source: String(data.site?.source ?? ""),
+    },
     params: { ...DEFAULT_PARAMS, ...(data.params || {}) },
     stage: Array.isArray(data.stage) ? data.stage.map((r) => ({ rl: toNum(r.rl), area: toNum(r.area), volume: toNum(r.volume) })) : [],
     readings: data.readings.map((r) => ({
@@ -391,6 +396,11 @@ function download(blob, filename) {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/** Save bytes (e.g. the PDF report) as a file. */
+export function downloadBytes(bytes, filename, type = "application/pdf") {
+  download(new Blob([bytes], { type }), filename);
 }
 
 export function saveProjectFile(project) {

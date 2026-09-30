@@ -2,7 +2,7 @@
 // Expected values are the workbook's cached results (test/fixtures), read
 // with openpyxl — not recomputed here, so a formula slip on either side shows.
 //
-// Run:  node --test test/
+// Run:  node --test "test/*.test.mjs"
 
 import test from "node:test";
 import assert from "node:assert/strict";

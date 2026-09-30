@@ -2393,3 +2393,234 @@ dialog textarea {
   color: var(--muted);
   margin: 2px 0 0 4px;
 }
+
+/* ------------------------------------------------------- start: two ways in */
+
+.ways {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+@media (min-width: 900px) {
+  .ways {
+    grid-template-columns: 7fr 5fr;
+  }
+}
+.way {
+  border-radius: var(--radius-card);
+  padding: 20px;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  min-width: 0;
+}
+@media (min-width: 720px) {
+  .way {
+    padding: 24px;
+  }
+}
+.way h3 {
+  font-size: 20px;
+  line-height: 1.25;
+}
+.way p {
+  color: var(--ink-2);
+  font-size: 15px;
+}
+.way-file {
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.way-steps {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+}
+.drop-zone {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 16px;
+  border: 2px dashed color-mix(in srgb, var(--accent) 55%, transparent);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+.drop-hint {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+body.dragging .drop-zone {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.way-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.way .way-foot {
+  font-size: 14px;
+  color: var(--muted);
+}
+.way-foot a {
+  color: var(--accent);
+  font-weight: 700;
+}
+@media (prefers-reduced-motion: reduce) {
+  .drop-zone {
+    transition: none;
+  }
+}
+
+/* The report tab's marker is a small document, not a number. */
+.step-icon svg {
+  width: 12px;
+  height: 12px;
+  margin-top: 3px;
+}
+
+/* ------------------------------------------------------------------ report */
+
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.report-actions-note {
+  font-size: 13.5px;
+  flex: 1 1 260px;
+}
+.report-empty ul {
+  margin: 8px 0 14px;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+/* What the PDF says, set like its first page: one sheet, quiet type. */
+.report-sheet {
+  background: var(--surface);
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  padding: 22px 18px;
+  max-width: 860px;
+}
+@media (min-width: 720px) {
+  .report-sheet {
+    padding: 40px 48px 44px;
+  }
+}
+.rs-kicker {
+  color: var(--accent);
+  font-weight: 800;
+  font-size: 14px;
+}
+.rs-title {
+  font-size: clamp(22px, 3.2vw, 30px);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  margin-top: 4px;
+}
+.rs-meta {
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+.rs-source {
+  color: var(--muted);
+  font-size: 13.5px;
+  margin-top: 2px;
+}
+.rs-headline {
+  background: var(--accent-soft);
+  padding: 16px 18px;
+  margin: 18px 0 8px;
+}
+.rs-big {
+  font-size: clamp(30px, 5vw, 40px);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+.rs-big .unit {
+  font-size: 0.55em;
+  margin-left: 4px;
+}
+.rs-headline p:last-child {
+  color: var(--ink-2);
+  margin-top: 4px;
+}
+.report-sheet h4 {
+  font-size: 16px;
+  margin: 22px 0 8px;
+}
+.rs-split .partition {
+  margin-top: 4px;
+}
+.rs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.rs-table th,
+.rs-table td {
+  border-bottom: 1px solid var(--rule);
+  padding: 7px 0;
+  vertical-align: top;
+  text-align: left;
+}
+.rs-table th {
+  font-weight: 600;
+  padding-right: 12px;
+}
+.rs-table td.num {
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  padding-right: 14px;
+}
+.rs-note {
+  color: var(--muted);
+  font-size: 13px;
+}
+@media (max-width: 600px) {
+  /* A narrow screen: the note moves under its label and value. */
+  .rs-table tr {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    border-bottom: 1px solid var(--rule);
+    padding: 7px 0;
+  }
+  .rs-table th,
+  .rs-table td {
+    border: 0;
+    padding: 0;
+  }
+  .rs-table td.num {
+    padding-right: 0;
+  }
+  .rs-table td.rs-note {
+    grid-column: 1 / -1;
+    padding-top: 2px;
+  }
+}
+.rs-checks {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--ink-2);
+  font-size: 14px;
+}
+
+/* ------------------------------------------------- embedded in OurWater */
+
+/* The app shows its own title and theme; the calculator keeps its steps. */
+.embed .brand,
+.embed .menu-theme,
+.embed .menu-panel hr:has(+ .menu-theme) {
+  display: none;
+}

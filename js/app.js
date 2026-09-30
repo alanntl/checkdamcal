@@ -39,7 +39,13 @@ const isNum = (v) => typeof v === "number" && Number.isFinite(v);
 const $ = (sel, root = document) => root.querySelector(sel);
 // Inside a page of the same site (OurWater) with ?embed: the host sends the
 // data and the theme, and hears when the dam's setup changes.
-const EMBED = new URLSearchParams(location.search).has("embed") && window.parent !== window;
+const EMBED_MODE = new URLSearchParams(location.search).get("embed");
+const EMBED = EMBED_MODE != null && window.parent !== window;
+// ?embed=focus: no header, tabs or status bar of its own. The host page shows
+// one panel at a time (message "goto"), gets told the state after every change
+// (message "state") and the content height (message "size"), so the page
+// scrolls as one and the host can draw its own steps and buttons.
+const FOCUS = EMBED && EMBED_MODE === "focus";
 
 const state = {
   project: null,
@@ -309,6 +315,7 @@ function renderAll({ readingsGrid = false } = {}) {
   updateRecession();
   updateReport();
   if (state.tab === "learn") ui.learn?.update();
+  announceState();
 }
 
 /** Problems from the engine, grouped by the step that fixes them. */
@@ -423,6 +430,8 @@ function showTab(name) {
   else ui.learn?.stop();
   if (state.results) renderStatus();
   stopPlay();
+  announceState();
+  if (FOCUS) window.scrollTo(0, 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -2675,6 +2684,7 @@ function wireHeader() {
 function init() {
   if (EMBED) {
     document.documentElement.classList.add("embed");
+    if (FOCUS) document.documentElement.classList.add("focus");
     window.addEventListener("message", onHostMessage);
   }
   const prefs = readStore(PREFS_KEY) || {};
@@ -2712,10 +2722,17 @@ function init() {
   renderAll({ readingsGrid: true });
   if (state.isExample) addNotice("balance", welcomeNotice());
   window.addEventListener("hashchange", () => showTab(tabFromHash() || "start"));
-  // First visit: Start here. Afterwards: where you left off.
-  showTab(tabFromHash() || (restored && TABS.includes(prefs.tab) ? prefs.tab : "start"));
+  // First visit: Start here. Afterwards: where you left off. In focus mode
+  // the host decides; until it does, the report (or the first step to finish).
+  if (FOCUS) showTab(state.results.wb.ok ? "report" : firstIncompleteStep());
+  else showTab(tabFromHash() || (restored && TABS.includes(prefs.tab) ? prefs.tab : "start"));
   // For checking and debugging in the browser console only.
   window.checkdamcal = { state, engine: E };
+  if (FOCUS) {
+    // The host sizes the frame to the content, so the page scrolls as one.
+    const ro = new ResizeObserver(() => postToHost({ type: "size", height: Math.ceil(document.documentElement.scrollHeight) }));
+    ro.observe(document.body);
+  }
   postToHost({ type: "ready" });
 }
 
@@ -2725,9 +2742,15 @@ function init() {
 // Messages are accepted only from the parent page, and only when it is on
 // this page's own origin: the calculator is served from the app itself.
 //   host -> here: {source:"ourwater", type:"load", project, title?, summary?, warnings?, readingsNote?}
+//                 {source:"ourwater", type:"file", file}          a File the user dropped on the host
+//                 {source:"ourwater", type:"example"}             the Badgaon example
+//                 {source:"ourwater", type:"goto", tab}           show one panel (focus mode)
+//                 {source:"ourwater", type:"export", what:"pdf"|"xlsx"|"project"}
 //                 {source:"ourwater", type:"theme", theme:"light"|"dark"}
 //                 {source:"ourwater", type:"mode", mode:"easy"|"advanced"}
 //   here -> host: {source:"checkdamcal", type:"ready"}
+//                 {source:"checkdamcal", type:"state", ...}       after every change (see announceState)
+//                 {source:"checkdamcal", type:"size", height}     focus mode: the content height
 //                 {source:"checkdamcal", type:"setup", setup:{params, stage, recession}}
 //                   (after the user changes the dam or the survey, so the host can keep it)
 
@@ -2752,6 +2775,41 @@ function announceSetup() {
   }, 800);
 }
 
+/** What the host needs to draw its own steps and buttons. */
+function announceState() {
+  if (!EMBED || !state.results) return;
+  const { wb, rec } = state.results;
+  const t = wb.ok ? wb.totals : null;
+  postToHost({
+    type: "state",
+    tab: state.tab,
+    ok: wb.ok,
+    isExample: state.isExample,
+    site: state.project.site?.name || "",
+    days: state.project.readings.length,
+    // What still has to be filled in, by the step that fixes it.
+    needs: {
+      dam: problemsBy("dam").map((q) => q.text),
+      survey: problemsBy("survey").map((q) => q.text),
+      readings: state.project.readings.length ? problemsBy("readings").map((q) => q.text) : ["Add the daily readings."],
+    },
+    pendingChecks: pendingChecks(),
+    headline: t
+      ? {
+          recharge: t.rechargeWithEnd,
+          inflow: t.inflow,
+          share: wb.ratios.rechargeToInflow,
+          evaporation: t.evaporationWithEnd,
+          spill: t.spill,
+          mdwirMm: wb.mdwir * 1000,
+          recessionMm: rec.ok && rec.pooled ? rec.pooled.infiltrationMm : null,
+          first: wb.days[0].date,
+          last: wb.days[wb.days.length - 1].date,
+        }
+      : null,
+  });
+}
+
 function onHostMessage(e) {
   if (e.source !== window.parent || e.origin !== location.origin) return;
   const m = e.data;
@@ -2759,6 +2817,16 @@ function onHostMessage(e) {
   if (m.type === "theme") applyTheme(m.theme === "dark" ? "dark" : "light", false);
   else if (m.type === "mode") applyMode(m.mode === "advanced" ? "advanced" : "easy");
   else if (m.type === "load") loadFromHost(m);
+  else if (m.type === "file" && m.file instanceof File) onFileChosen(m.file);
+  else if (m.type === "example") {
+    loadExample();
+    goTab("report");
+  } else if (m.type === "goto" && TABS.includes(m.tab)) goTab(m.tab);
+  else if (m.type === "export") {
+    if (m.what === "pdf") downloadReport();
+    else if (m.what === "xlsx") doExport();
+    else if (m.what === "project") saveProjectFile(state.project);
+  }
 }
 
 function loadFromHost(m) {

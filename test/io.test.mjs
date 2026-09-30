@@ -149,12 +149,52 @@ test("the fill-in template, filled with the example, reads back to the same proj
   assert.equal(computeWaterBalance(project).totals.rechargeWithEnd, computeWaterBalance(ex).totals.rechargeWithEnd);
 });
 
-test("the blank template reads back as an empty site with directions", () => {
-  const bytes = XLSX.write(buildTemplateWorkbook(null), { type: "buffer", bookType: "xlsx" });
+test("the blank template has the defaults, and its example columns are never imported", () => {
+  const book = buildTemplateWorkbook(null);
+  const bytes = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
   const { project, warnings } = fromSimpleTemplate(XLSX.read(bytes, { type: "buffer" }), "template.xlsx");
-  assert.equal(project.readings.length, 0);
+  // Defaults filled in where the calculator has one...
+  assert.equal(project.params.evaporation, 0.005);
+  assert.equal(project.params.weirCoefficient, 1.6);
+  assert.equal(project.params.weirExponent, 1.5);
+  // ...and the site's own values left blank, though Badgaon's sit beside them.
   assert.equal(project.params.gaugeZeroRl, null);
-  assert.equal(warnings.length, 3);
+  assert.equal(project.params.ctfRl, null);
+  assert.equal(project.params.weirLength, null);
+  assert.equal(project.params.catchmentHa, null);
+  assert.equal(project.stage.length, 0);
+  assert.equal(project.readings.length, 0);
+  // Survey and readings still to fill in; no "rows skipped" noise from the examples.
+  assert.equal(warnings.length, 2);
+  assert.ok(warnings.every((w) => !/skipped/.test(w)));
+  const dam = XLSX.utils.sheet_to_json(book.Sheets["Check dam"], { header: 1 });
+  assert.equal(dam[0][4], "Example (Badgaon 2014)");
+  const row = (item) => dam.find((r) => r[0] === item);
+  assert.equal(row("Gauge zero level")[1], undefined); // blank for the user
+  assert.equal(row("Gauge zero level")[4], 98.43); // the example beside it
+  assert.equal(row("Evaporation")[1], 5); // the default, in mm/day
+});
+
+test("a filled-in blank template imports the user's values, not the examples", () => {
+  const book = buildTemplateWorkbook(null);
+  const put = (sheet, ref, v) => (book.Sheets[sheet][ref] = { t: typeof v === "number" ? "n" : "s", v });
+  put("Check dam", "B2", 101.5); // gauge zero
+  put("Check dam", "B3", 103); // spillway level
+  put("Check dam", "B4", 20); // spillway length
+  put("Pond survey", "A2", 100.9);
+  put("Pond survey", "B2", 0);
+  put("Pond survey", "A3", 103.5);
+  put("Pond survey", "B3", 5000);
+  put("Daily readings", "A2", "2025-08-01");
+  put("Daily readings", "B2", 40);
+  put("Daily readings", "C2", 12);
+  const bytes = XLSX.write(book, { type: "buffer", bookType: "xlsx" });
+  const { project, warnings } = fromSimpleTemplate(XLSX.read(bytes, { type: "buffer" }), "mine.xlsx");
+  assert.equal(project.params.gaugeZeroRl, 101.5);
+  assert.equal(project.params.evaporation, 0.005); // the default, untouched
+  assert.deepEqual(project.stage.map((r) => [r.rl, r.area]), [[100.9, 0], [103.5, 5000]]);
+  assert.deepEqual(project.readings.map((r) => [r.date, r.gauge, r.rain]), [["2025-08-01", 40, 12]]);
+  assert.deepEqual(warnings, []);
 });
 
 test("the example CSV files import as readings, survey and check dam", () => {

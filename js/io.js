@@ -6,6 +6,7 @@
 
 import { isoFromDayNumber, dayNumber, DEFAULT_PARAMS, DEFAULT_RECESSION, DRY_DAY_RULE } from "./engine.js";
 import { dateRange, trim } from "./format.js";
+import { badgaonExample } from "./example.js";
 
 const TEMPLATE_SHEET = "1 Daily & seasonal waterbalance";
 const STAGE_SHEET = "2. Area-RL and Vol EL curves";
@@ -237,10 +238,13 @@ export function readingsFromRows(aoa) {
   if (col.gauge < 0 && col.level < 0) return null;
   const readings = [];
   let skipped = 0;
+  // Only the columns read count: the template's example columns to the right
+  // may fill a row that has no reading of its own.
+  const readCols = Object.values(col).filter((i) => i >= 0);
   for (const row of aoa.slice(hi + 1)) {
     const date = toIsoDate(row[col.date]);
     if (!date) {
-      if (row.some((c) => c != null && c !== "")) skipped += 1;
+      if (readCols.some((i) => row[i] != null && row[i] !== "")) skipped += 1;
       continue;
     }
     const levelCell = col.level >= 0 ? row[col.level] : null;
@@ -455,10 +459,21 @@ export function damCsv(project) {
   return [["Item", "Value", "Unit", "Notes"], ...DAM_ROWS(project.params)].map(csvLine).join("\n") + "\n";
 }
 
+/** How many example rows the blank template shows beside the daily readings. */
+const TEMPLATE_EXAMPLE_DAYS = 10;
+const EXAMPLE_HEAD = "Example (Badgaon 2014)";
+
 /**
  * The fill-in template workbook: "Read me", "Check dam", "Pond survey" and
- * "Daily readings". With a project it is filled in (e.g. the Badgaon example);
- * without one, it has the headers, units and notes only.
+ * "Daily readings". With a project it is filled in (e.g. the Badgaon example).
+ *
+ * Without one (the blank template), the Check dam sheet has the calculator's
+ * own defaults filled in where one exists — evaporation 5 mm/day, weir
+ * coefficient 1.6, exponent 1.5 — and each sheet shows the Badgaon values in
+ * example columns to the RIGHT of the real ones. The dam's own levels, the
+ * survey and the readings stay blank: a default there would silently give a
+ * wrong answer. The importer reads the first matching column and skips rows
+ * with nothing in the columns it reads, so the examples are never imported.
  */
 export function buildTemplateWorkbook(project = null) {
   const XL = X();
@@ -476,6 +491,12 @@ export function buildTemplateWorkbook(project = null) {
         [],
         ["Fill in the three sheets, save, and open the file in CheckDamCal (https://alanntl.github.io/checkdamcal/) with the Import button."],
         ["Keep the sheet names and the header rows as they are. Leave a cell blank if you don’t have the value."],
+        ...(project
+          ? []
+          : [
+              ["Evaporation and the two weir values are filled in with the usual defaults: change them if you have your own."],
+              [`The “${EXAMPLE_HEAD}” columns on the right show what goes where, from the Badgaon check dam. They are never imported: type your own values in the columns on the left.`],
+            ]),
         [],
         ["Sheet", "What goes in it", "How often"],
         ["Check dam", "The heights of the gauge board’s 0 cm mark and of the spillway, and the spillway’s length (all in metres, from the same reference point). Evaporation in mm per day. Catchment area in hectares (optional).", "Once"],
@@ -486,16 +507,38 @@ export function buildTemplateWorkbook(project = null) {
     ),
     "Read me",
   );
-  XL.utils.book_append_sheet(book, sheet([["Item", "Value", "Unit", "Notes"], ...DAM_ROWS(project?.params)], [20, 10, 8, 70]), "Check dam");
-  const stage = project ? project.stage.filter((r) => isNum(r.rl) || isNum(r.area)) : [];
-  XL.utils.book_append_sheet(book, sheet([SURVEY_HEADER, ...stage.map((r) => [r.rl, r.area, r.volume])], [12, 16, 14]), "Pond survey");
-  const readings = project ? project.readings : [];
-  const ws = sheet([READINGS_HEADER, ...readings.map((r) => [null, r.gauge, r.rain, levelCell(r.level)])], [12, 18, 14, 18]);
   // Real Excel dates (serial numbers shown as yyyy-mm-dd), so the column sorts and filters as dates.
-  readings.forEach((r, i) => {
-    const serial = dayNumber(r.date) + 25569;
-    if (Number.isFinite(serial)) ws[XL.utils.encode_cell({ r: i + 1, c: 0 })] = { t: "n", v: serial, z: "yyyy-mm-dd" };
-  });
+  const dateCell = (ws, r, c, iso) => {
+    const serial = dayNumber(iso) + 25569;
+    if (Number.isFinite(serial)) ws[XL.utils.encode_cell({ r, c })] = { t: "n", v: serial, z: "yyyy-mm-dd" };
+  };
+
+  if (project) {
+    XL.utils.book_append_sheet(book, sheet([["Item", "Value", "Unit", "Notes"], ...DAM_ROWS(project.params)], [20, 10, 8, 70]), "Check dam");
+    const stage = project.stage.filter((r) => isNum(r.rl) || isNum(r.area));
+    XL.utils.book_append_sheet(book, sheet([SURVEY_HEADER, ...stage.map((r) => [r.rl, r.area, r.volume])], [12, 16, 14]), "Pond survey");
+    const ws = sheet([READINGS_HEADER, ...project.readings.map((r) => [null, r.gauge, r.rain, levelCell(r.level)])], [12, 18, 14, 18]);
+    project.readings.forEach((r, i) => dateCell(ws, i + 1, 0, r.date));
+    XL.utils.book_append_sheet(book, ws, "Daily readings");
+    return book;
+  }
+
+  // The blank template: defaults where they exist, examples on the right.
+  const ex = badgaonExample();
+  const defaults = { ...DEFAULT_PARAMS, gaugeZeroRl: null, ctfRl: null, weirLength: null, catchmentHa: null };
+  const exampleRows = DAM_ROWS(ex.params);
+  const damRows = DAM_ROWS(defaults).map((row, i) => [...row, exampleRows[i][1]]);
+  XL.utils.book_append_sheet(book, sheet([["Item", "Value", "Unit", "Notes", EXAMPLE_HEAD], ...damRows], [20, 10, 8, 70, 22]), "Check dam");
+
+  const survey = [[...SURVEY_HEADER, "", `${EXAMPLE_HEAD}: level (m)`, "Example: area (m²)", "Example: volume (m³)"]];
+  ex.stage.forEach((r) => survey.push([null, null, null, null, r.rl, r.area, r.volume]));
+  XL.utils.book_append_sheet(book, sheet(survey, [12, 16, 14, 3, 30, 18, 20]), "Pond survey");
+
+  const days = ex.readings.slice(0, TEMPLATE_EXAMPLE_DAYS);
+  const readingsAoa = [[...READINGS_HEADER, "", `${EXAMPLE_HEAD}: date`, "Example: gauge (cm)", "Example: rainfall (mm)"]];
+  days.forEach((r) => readingsAoa.push([null, null, null, null, null, null, r.gauge, r.rain]));
+  const ws = sheet(readingsAoa, [12, 18, 14, 18, 3, 28, 20, 22]);
+  days.forEach((r, i) => dateCell(ws, i + 1, 5, r.date));
   XL.utils.book_append_sheet(book, ws, "Daily readings");
   return book;
 }

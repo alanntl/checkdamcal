@@ -32,11 +32,33 @@ a push to that branch updates it in about a minute.
 | **3 · Daily readings** | Gauge reading (cm) and rainfall (mm) for every day | The daily rise and fall shows inflow, recharge and evaporation |
 | **4 · Results** | — | Recharge, evaporation, spill, charts, download (.xlsx) |
 | **5 · Infiltration rate** (optional) | — | Rate from dry-weather recessions: needs only the gauge and rain |
+| **Report** | — | The result on a few pages: **Download the PDF report** |
 
-**Start here** explains all of this with a diagram. **Easy** view keeps to the
-essentials in plain words; **Advanced** adds every setting and table from the
-workbook (weir coefficients, infiltration periods, sensitivity, the daily table,
-recession thresholds and fits).
+**Start here** offers two ways in. *Have the data in a file?* Drop the MyCheckDam
+spreadsheet, a filled-in template or a saved project, and a complete file lands
+straight on the **Report** (the researcher's path: file in, PDF out). *Or enter
+it step by step*, with the diagram and "what you need, in this order" below.
+**Easy** view keeps to the essentials in plain words; **Advanced** adds every
+setting and table from the workbook (weir coefficients, infiltration periods,
+sensitivity, the daily table, recession thresholds and fits).
+
+## The PDF report
+
+Made in the browser by `js/report.js` + `js/pdf.js` (a small PDF writer with no
+dependencies: Helvetica, WinAnsi text, vector charts), so the file is the same
+in every browser and in the tests. For Badgaon it is six A4 pages:
+
+1. The result, where the water went, key numbers, what went in (dam, survey,
+   readings).
+2. Rainfall, water level with the spillway, running totals, and the dry-day
+   infiltration rate, on one shared date axis.
+3. How the numbers were worked out, assumptions and limits, checks on the data,
+   infiltration by period, and how much the result depends on each input.
+4. The gauge-only (dry spell) estimate, then every day's numbers.
+
+The Report page shows the same model on screen (`reportModel`), so the page and
+the PDF cannot disagree. Text outside WinAnsi (e.g. a Devanagari site name) is
+written as `?` in the PDF; the on-screen report shows it as typed.
 
 ## Learn — the calculation, one picture at a time
 
@@ -96,6 +118,10 @@ MYCHECKDAM_XLSX=/path/to/MyCheckDam.xlsx node --test "test/*.test.mjs"   # + rea
 The import tests also round-trip the template and every CSV, and import the
 files in `examples/` as shipped.
 
+`test/report.test.mjs` checks the PDF is well formed (every xref offset lands on
+its object, every stream's length is exact, the body is ASCII) and carries the
+verified numbers, and that the report model says what the results say.
+
 `test/fixtures/badgaon-2014.json` holds the workbook's own cached cell values
 (read with openpyxl). The engine tests reproduce them: every daily column G–V
 of sheet 1 for all 120 days, the season totals, counts and ratios (rows
@@ -123,13 +149,35 @@ Deliberate, and listed in the tool under **Learn → For experts**:
   (yesterday's level − 1.1 × evaporation, `D = AC`), which follows the
   evaporation rate as the workbook's formula does.
 
+## Inside OurWater
+
+OurWater (Advanced analytics → **Check dam calculator**, Super Admin only for
+now) serves a copy of these files from its own origin at
+`/tools/checkdamcal/index.html?embed=1` and frames it. The copy is made by
+`frontend/scripts/sync-checkdamcal.mjs` in the OurWater repo, which records the
+commit it came from in `VERSION.txt`; change the calculator here, then copy it
+again.
+
+With `?embed` and a parent page on the same origin, the calculator hides its
+brand and theme menu and talks to the parent by `postMessage` (both sides check
+the origin and the sending window):
+
+| Direction | Message | Meaning |
+|---|---|---|
+| here → host | `{source:"checkdamcal", type:"ready"}` | the calculator is listening |
+| host → here | `{source:"ourwater", type:"load", project, title?, summary?, warnings?, readingsNote?}` | replace the project with this one; a complete one opens on the Report |
+| host → here | `{source:"ourwater", type:"theme", theme}` / `{…, type:"mode", mode}` | follow the app's light/dark theme and Easy/Advanced mode |
+| here → host | `{source:"checkdamcal", type:"setup", setup:{params, stage, recession}}` | the user changed the dam or the pond survey (debounced); OurWater saves it on the station |
+
 ## Files
 
 ```
 index.html          page shell and the For-experts formula reference
 css/styles.css      tokens (MyWell teal/ink), light + dark, layout
 js/engine.js        the calculations — pure functions, no DOM
-js/app.js           steps, inputs, results, Easy/Advanced
+js/app.js           steps, inputs, results, Easy/Advanced, report page, embedding
+js/report.js        the report model, and the PDF built from it
+js/pdf.js           a small PDF writer (A4, Helvetica, vector drawing)
 js/charts.js        SVG time and XY charts (crosshair, table view)
 js/section.js       the dam section drawing and the Start-page diagram
 js/io.js            import (.xlsx/.csv/.json), template and example writers, export

@@ -158,15 +158,21 @@ now) serves a copy of these files from its own origin at
 commit it came from in `VERSION.txt`; change the calculator here, then copy it
 again.
 
-With `?embed` and a parent page on the same origin, the calculator hides its
-brand and theme menu and talks to the parent by `postMessage` (both sides check
-the origin and the sending window):
+With `?embed=focus` and a parent page on the same origin, the calculator shows
+no header, tabs or status bar of its own: the host page shows one panel at a
+time, draws its own steps and buttons, and sizes the frame to the content so
+its page scrolls as one. (`?embed` alone keeps the calculator's chrome and
+only hides the brand and theme menu.) Both sides talk by `postMessage` and
+check the origin and the sending window:
 
 | Direction | Message | Meaning |
 |---|---|---|
 | here → host | `{source:"checkdamcal", type:"ready"}` | the calculator is listening |
 | host → here | `{source:"ourwater", type:"load", project, title?, summary?, warnings?, readingsNote?}` | replace the project with this one; a complete one opens on the Report |
+| host → here | `{source:"ourwater", type:"file", file}` / `{…, type:"example"}` | read a File the user dropped on the host; load the Badgaon example |
+| host → here | `{source:"ourwater", type:"goto", tab}` / `{…, type:"export", what:"pdf"\|"xlsx"\|"project"}` | show one panel; download |
 | host → here | `{source:"ourwater", type:"theme", theme}` / `{…, type:"mode", mode}` | follow the app's light/dark theme and Easy/Advanced mode |
+| here → host | `{source:"checkdamcal", type:"state", tab, ok, needs, headline, …}` / `{…, type:"size", height}` | after every change: what is missing by step, the headline numbers; the content height (focus) |
 | here → host | `{source:"checkdamcal", type:"setup", setup:{params, stage, recession}}` | the user changed the dam or the pond survey (debounced); OurWater saves it on the station |
 
 ## Files

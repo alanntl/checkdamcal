@@ -2627,6 +2627,7 @@ body.dragging .drop-zone {
 /* Focus mode: the host page owns the steps, the buttons and the scrolling,
    so this document is just the current panel with no chrome of its own. */
 .focus .app-header,
+.focus .app-footer,
 .focus .status-bar,
 .focus .step-foot,
 .focus .report-actions,

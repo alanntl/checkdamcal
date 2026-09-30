@@ -33,14 +33,14 @@ const C = REPORT_COLORS;
 
 export const METHOD_CREDIT = "Method of the MyCheckDam workbook (water balance template by Peter Dillon, MARVI).";
 
-/** A file-name-safe version of the site name. */
-export function reportFileName(project) {
+/** The PDF's file name: the site, then the moment it was made (local time), e.g. badgaon-check-dam-2014-water-balance-2026-09-30-1547.pdf */
+export function reportFileName(project, when = new Date()) {
   const base = String(project?.site?.name || "check-dam")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
     .slice(0, 60);
-  return `${base || "check-dam"}-water-balance.pdf`;
+  return `${base || "check-dam"}-water-balance-${F.fileStamp(when)}.pdf`;
 }
 
 /**
@@ -278,7 +278,7 @@ function summaryPage(doc, m) {
   const titleLines = doc.wrap(m.site, CW, 22, true);
   titleLines.forEach((line, i) => doc.text(line, M.l, y + 22 + i * 26, { size: 22, bold: true, color: C.ink }));
   y += titleLines.length * 26 + 10;
-  const generated = F.date(m.generatedAt.toISOString().slice(0, 10));
+  const generated = F.dateTime(m.generatedAt);
   doc.text(`${m.period.label} · ${m.period.days} days · report made ${generated}`, M.l, y + 10, { size: 10, color: C.ink2 });
   y += 16;
   if (m.source) {

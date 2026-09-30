@@ -112,8 +112,22 @@ test("the Badgaon PDF is well formed, six pages, and prints the headline numbers
   assert.equal((text.match(/\(\d{1,2} (?:Jul|Aug|Sep|Oct|Nov) 2014\) Tj/g) || []).length >= 120, true);
 });
 
-test("the PDF file name comes from the site name", () => {
-  assert.equal(reportFileName({ site: { name: "Badgaon check dam, 2014" } }), "badgaon-check-dam-2014-water-balance.pdf");
-  assert.equal(reportFileName({ site: { name: "बड़गांव" } }), "check-dam-water-balance.pdf");
-  assert.equal(reportFileName({}), "check-dam-water-balance.pdf");
+test("the PDF file name comes from the site name and the moment it was made", () => {
+  // Built from local-time parts, so the test means the same in every time zone.
+  const when = new Date(2026, 8, 30, 15, 47, 12);
+  assert.equal(reportFileName({ site: { name: "Badgaon check dam, 2014" } }, when), "badgaon-check-dam-2014-water-balance-2026-09-30-1547.pdf");
+  assert.equal(reportFileName({ site: { name: "बड़गांव" } }, when), "check-dam-water-balance-2026-09-30-1547.pdf");
+  assert.equal(reportFileName({}, when), "check-dam-water-balance-2026-09-30-1547.pdf");
+  // Single digits are padded, so names sort by time.
+  assert.equal(reportFileName({}, new Date(2027, 0, 5, 7, 4)), "check-dam-water-balance-2027-01-05-0704.pdf");
+  // Without a moment it uses now, in the same shape.
+  assert.match(reportFileName({}), /^check-dam-water-balance-\d{4}-\d{2}-\d{2}-\d{4}\.pdf$/);
+});
+
+test("the report prints when it was made on the reader's own clock, not UTC's", () => {
+  const p = badgaonExample();
+  // 00:30 local on 1 Oct. East of Greenwich the UTC date of this instant is still 30 Sep,
+  // which is what the first version printed.
+  const { text } = checkStructure(buildReportPdf(p, results(p), { source: "x", generatedAt: new Date(2026, 9, 1, 0, 30) }));
+  assert.ok(text.includes("report made 1 Oct 2026, 00:30"), "date and time as on the reader's clock");
 });

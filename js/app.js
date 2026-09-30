@@ -2427,8 +2427,10 @@ function downloadReport() {
     return;
   }
   try {
-    const bytes = buildReportPdf(state.project, state.results, { source: reportSource() });
-    downloadBytes(bytes, reportFileName(state.project));
+    // One moment for both: the name of the file and the time printed inside it.
+    const when = new Date();
+    const bytes = buildReportPdf(state.project, state.results, { source: reportSource(), generatedAt: when });
+    downloadBytes(bytes, reportFileName(state.project, when));
   } catch (err) {
     addNotice("report", { kind: "error", title: "Couldn’t make the PDF.", body: err?.message || String(err) });
     goTab("report");

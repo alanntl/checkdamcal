@@ -60,6 +60,12 @@ The Report page shows the same model on screen (`reportModel`), so the page and
 the PDF cannot disagree. Text outside WinAnsi (e.g. a Devanagari site name) is
 written as `?` in the PDF; the on-screen report shows it as typed.
 
+The file is named after the site and the moment it was made, on the reader's own
+clock: `badgaon-check-dam-2014-water-balance-2026-09-30-1547.pdf`. The first page
+says the same ("report made 30 Sep 2026, 15:47"). The results workbook is named
+the same way (`…-results-2026-09-30-1547.xlsx`), so downloads made at different
+times never share a name.
+
 ## Learn — the calculation, one picture at a time
 
 The **Learn** page is the teaching part. Pick a day (or *A rainy day*, *A dry
@@ -142,6 +148,8 @@ Deliberate, and listed in the tool under **Learn → For experts**:
   0.19 cm/d.
 - The sensitivity table is recalculated live. The workbook's pasted C₁ row is
   labelled 1.28 but its values are for 1.3.
+- R² of each dry spell is calculated. The workbook's typed R² row (S117:W117)
+  has 0.9781 for the second spell; its own chart label and the data give 0.9827.
 - Levels above the survey extend its top segment with a warning (workbook:
   `#REF!`); recession readings of 0 cm are skipped (the water is at or below the
   gauge zero).

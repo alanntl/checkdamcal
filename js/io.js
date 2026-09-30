@@ -5,7 +5,7 @@
 // page through textContent.
 
 import { isoFromDayNumber, dayNumber, DEFAULT_PARAMS, DEFAULT_RECESSION, DRY_DAY_RULE } from "./engine.js";
-import { dateRange, trim } from "./format.js";
+import { dateRange, trim, fileStamp } from "./format.js";
 import { badgaonExample } from "./example.js";
 
 const TEMPLATE_SHEET = "1 Daily & seasonal waterbalance";
@@ -716,7 +716,12 @@ export function buildResultsWorkbook(project, wb, rec, sens) {
   return book;
 }
 
-export function exportResults(project, wb, rec, sens) {
+/** The results workbook's file name: the site, then the moment it was made (local time). */
+export function resultsFileName(project, when = new Date()) {
+  return `${slug(project.site?.name)}-results-${fileStamp(when)}.xlsx`;
+}
+
+export function exportResults(project, wb, rec, sens, when = new Date()) {
   const book = buildResultsWorkbook(project, wb, rec, sens);
-  X().writeFile(book, `${slug(project.site?.name)}-results.xlsx`, { compression: true });
+  X().writeFile(book, resultsFileName(project, when), { compression: true });
 }

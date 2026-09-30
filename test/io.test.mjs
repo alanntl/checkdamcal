@@ -19,7 +19,7 @@ vm.runInContext(readFileSync(fileURLToPath(new URL("../vendor/xlsx.mini.min.js",
 globalThis.window = { XLSX: sandbox.XLSX || sandbox.window.XLSX };
 const XLSX = globalThis.window.XLSX;
 
-const { fromTemplate, fromTable, fromSimpleTemplate, checkProject, toIsoDate, buildResultsWorkbook, buildTemplateWorkbook, readingsCsv, surveyCsv, damCsv } =
+const { fromTemplate, fromTable, fromSimpleTemplate, checkProject, toIsoDate, buildResultsWorkbook, buildTemplateWorkbook, readingsCsv, surveyCsv, damCsv, resultsFileName } =
   await import("../js/io.js");
 const { badgaonExample } = await import("../js/example.js");
 const { computeWaterBalance, computeRecession, runSensitivity, gaugeCtfCm } = await import("../js/engine.js");
@@ -128,6 +128,12 @@ test("the results workbook has every sheet and the headline numbers", () => {
   assert.equal(daily.length, 121);
 });
 
+
+test("the results file name has the site and the moment it was made", () => {
+  const when = new Date(2026, 8, 30, 9, 5); // local-time parts: the same in every zone
+  assert.equal(resultsFileName({ site: { name: "Badgaon check dam, 2014" } }, when), "badgaon-check-dam-2014-results-2026-09-30-0905.xlsx");
+  assert.equal(resultsFileName({}, when), "check-dam-results-2026-09-30-0905.xlsx");
+});
 
 test("the fill-in template, filled with the example, reads back to the same project", () => {
   const ex = badgaonExample();

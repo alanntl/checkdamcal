@@ -49,6 +49,18 @@ export function date(iso, { year = true } = {}) {
   return year ? `${s} ${m[1]}` : s;
 }
 
+const pad2 = (n) => String(n).padStart(2, "0");
+
+/** A moment on the reader's own clock: "30 Sep 2026, 15:47". */
+export function dateTime(when = new Date()) {
+  return `${when.getDate()} ${MONTHS[when.getMonth()]} ${when.getFullYear()}, ${pad2(when.getHours())}:${pad2(when.getMinutes())}`;
+}
+
+/** The same moment for a file name, with no character a file system dislikes: "2026-09-30-1547". */
+export function fileStamp(when = new Date()) {
+  return `${when.getFullYear()}-${pad2(when.getMonth() + 1)}-${pad2(when.getDate())}-${pad2(when.getHours())}${pad2(when.getMinutes())}`;
+}
+
 /** Day number (days since epoch, may be fractional) -> "16 Jul 2014". */
 export function dateFromDay(dayNumber, opts) {
   const d = new Date(Math.floor(dayNumber) * 86400000);

@@ -2629,7 +2629,8 @@ body.dragging .drop-zone {
 .focus .app-header,
 .focus .status-bar,
 .focus .step-foot,
-.focus .report-actions {
+.focus .report-actions,
+.focus .step-kicker {
   display: none;
 }
 .focus body {

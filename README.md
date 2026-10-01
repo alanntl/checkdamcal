@@ -159,8 +159,8 @@ Deliberate, and listed in the tool under **Learn → For experts**:
 
 ## Inside OurWater
 
-OurWater (Advanced analytics → **Check dam calculator**, Super Admin only for
-now) serves a copy of these files from its own origin at
+OurWater (Advanced analytics → **Tool marketplace** → **Check dam calculator**,
+open to Super Admins, Tool Admins and the people they add) serves a copy of these files from its own origin at
 `/tools/checkdamcal/index.html?embed=1` and frames it. The copy is made by
 `frontend/scripts/sync-checkdamcal.mjs` in the OurWater repo, which records the
 commit it came from in `VERSION.txt`; change the calculator here, then copy it

@@ -2640,9 +2640,10 @@ body.dragging .drop-zone {
 /* Focus mode shows just the form unless the host turns explanations on
    (message "explain"): no why / you'll-need text, lesson links, help lines,
    tips, diagrams, survey charts, checks card, or info and warning notices.
-   Errors stay. */
+   Errors stay, and so do notes about the data itself (.notice-keep: what was
+   loaded, which rain gauge, how many days have rain). */
 .focus:not(.explain) :is(.step-why, .step-need, .learn-link, .field .help, .choice .help, .diagram-caption, p.toolbar-note, .card p.muted),
-.focus:not(.explain) .notice:not(.error),
+.focus:not(.explain) .notice:not(.error):not(.notice-keep),
 .focus:not(.explain) .dam-layout > :nth-child(2),
 .focus:not(.explain) #panel-survey .grid-2 > :nth-child(2),
 .focus:not(.explain) #panel-readings .stack > .card:first-child {

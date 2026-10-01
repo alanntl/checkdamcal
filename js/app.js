@@ -135,10 +135,11 @@ function icon(kind) {
 const KIND_LABEL = { info: "Note", warn: "Check", error: "Problem", ok: "OK" };
 
 /** A notice box: kind info|warn|error; body is a string or nodes. */
-function notice(kind, title, body, { actions = [], onClose } = {}) {
+/** `keep`: a note about the data itself, shown even when focus mode hides the explanations. */
+function notice(kind, title, body, { actions = [], onClose, keep = false } = {}) {
   return h(
     "div",
-    { class: `notice ${kind === "info" ? "" : kind}`, role: kind === "error" ? "alert" : "status" },
+    { class: `notice ${kind === "info" ? "" : kind}${keep ? " notice-keep" : ""}`, role: kind === "error" ? "alert" : "status" },
     icon(kind),
     h(
       "div",
@@ -164,6 +165,7 @@ function renderNotices(panel, extra = []) {
     ...extra,
     ...state.notices[panel].map((n, i) =>
       notice(n.kind, n.title, n.body, {
+        keep: !!n.keep,
         actions: n.actions ? n.actions() : [],
         onClose: () => {
           state.notices[panel].splice(i, 1);
@@ -2853,8 +2855,19 @@ function loadFromHost(m) {
   saveSoon();
   const target = state.results.wb.ok ? "report" : firstIncompleteStep();
   const lines = Array.isArray(m.summary) ? m.summary.map(String) : [];
-  addNotice(target, { kind: "info", title: m.title ? String(m.title) : "Loaded from OurWater.", body: lines.length ? h("ul", {}, lines.map((l) => h("li", { text: l }))) : null });
-  for (const w of Array.isArray(m.warnings) ? m.warnings : []) addNotice(target, { kind: "warn", title: null, body: String(w) });
+  // What came in (days, rainfall source, how many days have rain) and what to
+  // watch for, on the Daily readings step where the readings are checked, and
+  // on the panel that opens first. Kept visible in focus mode: it is about the
+  // data, not an explanation.
+  for (const panel of new Set([target, "readings"])) {
+    addNotice(panel, {
+      kind: "info",
+      keep: true,
+      title: m.title ? String(m.title) : "Loaded from OurWater.",
+      body: lines.length ? h("ul", {}, lines.map((l) => h("li", { text: l }))) : null,
+    });
+    for (const w of Array.isArray(m.warnings) ? m.warnings : []) addNotice(panel, { kind: "warn", keep: true, title: null, body: String(w) });
+  }
   if (m.readingsNote) addNotice("readings", { kind: "info", title: null, body: String(m.readingsNote) });
   goTab(target);
 }
